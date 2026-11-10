@@ -1,0 +1,10 @@
+{
+  "name": "Piano Coach",
+  "short_name": "Piano Coach",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#14161c",
+  "theme_color": "#14161c",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

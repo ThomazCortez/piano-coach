@@ -1,0 +1,4 @@
+.claude/
+*.mid
+*.pdf
+__pycache__/
