@@ -79,10 +79,10 @@
   </div>
   <input id="pos" type="range" min="0" max="1000" value="0" aria-label="Position">
 </div>
-<div id="status"></div>
+<div id="status" role="status"></div>
 <div id="stage">
   <canvas id="roll"></canvas>
-  <div id="msg"><div id="msgBody"></div></div>
+  <div id="msg"><div id="msgBody" role="alertdialog" aria-live="assertive"></div></div>
 </div>
 <script src="vendor/Midi.js"></script>
 <script src="matcher.js"></script>

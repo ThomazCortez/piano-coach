@@ -111,7 +111,8 @@ $('file').onchange = async e => {
     loadMidi(buf, f.name);
     saveLast(buf, f.name);
   } catch (err) {
-    status(`Could not read "${f.name}" as a MIDI song. Pick a MIDI file.`);
+    status(typeof Midi === 'undefined' ? 'The MIDI reader (vendor/Midi.js) did not load, so songs cannot be opened.'
+      : `Could not read "${f.name}" as a MIDI song. Pick a MIDI file.`);
   }
   e.target.value = '';
 };
@@ -155,6 +156,7 @@ function start(m) {
   if (!song) return status('Open a song first (or tap Demo).');
   audio().resume();
   mode = m;
+  learn = null; // a leftover learn state would make Listen stop and wait for the player
   if (m === 'learn') {
     learn = newLearn(song.notes, hands());
     seekStep(learn, t);
@@ -166,9 +168,15 @@ function start(m) {
   $('listen').classList.toggle('on', m === 'listen');
   $('learn').classList.toggle('on', m === 'learn');
 }
+let wake = null;
 function setPlaying(on) {
   playing = on;
   $('pause').textContent = on || mode === 'idle' ? '⏸' : '▶';
+  // Keep the screen on while playing: the hands are on the piano, not the phone.
+  if (!on) { wake?.release(); wake = null; }
+  else if (!wake || wake.released) navigator.wakeLock?.request('screen')
+    .then(w => { if (playing && (!wake || wake.released)) wake = w; else w.release(); })
+    .catch(() => {});
 }
 function stop() {
   mode = 'idle';
@@ -258,6 +266,7 @@ const pointers = new Map();
 canvas.addEventListener('pointerdown', e => {
   const m = keyAt(e.offsetX, e.offsetY);
   if (m == null) return;
+  canvas.setPointerCapture(e.pointerId); // mouse released outside the canvas must still lift the key
   pointers.set(e.pointerId, m);
   down.add(m);
   playerPress(m, { sound: true });
@@ -265,6 +274,16 @@ canvas.addEventListener('pointerdown', e => {
 const release = e => { down.delete(pointers.get(e.pointerId)); pointers.delete(e.pointerId); };
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
+
+// Double tap above the keys toggles fullscreen. On pointerup: a touch only counts as a user gesture when it lifts.
+let lastTap = -1e9;
+canvas.addEventListener('pointerup', e => {
+  if (keyAt(e.offsetX, e.offsetY) != null) return;
+  if (e.timeStamp - lastTap < 350) {
+    lastTap = -1e9;
+    (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen())?.catch(() => {});
+  } else lastTap = e.timeStamp;
+});
 
 // MIDI keyboard (USB-OTG or Bluetooth). The piano makes its own sound, so no tone here.
 async function enableMidi() {
@@ -299,7 +318,7 @@ async function enableMic() {
     an.fftSize = 8192; // ~5 Hz per bin, enough to tell neighbouring notes apart above ~C2
     an.smoothingTimeConstant = 0.2;
     a.createMediaStreamSource(stream).connect(an);
-    mic = { an, buf: new Float32Array(an.frequencyBinCount), thr: null, above: new Set(), prev: new Map() };
+    mic = { stream, an, buf:new Float32Array(an.frequencyBinCount), thr: null, above: new Set(), prev: new Map() };
     calibrate();
   } catch (err) {
     status('Microphone blocked: ' + err.message);
@@ -317,16 +336,18 @@ function micLevel(midi) { // loudest of fundamental and 2nd harmonic (low piano 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function sample(ms, fn) {
   const end = performance.now() + ms;
-  while (performance.now() < end) { mic.an.getFloatFrequencyData(mic.buf); fn(); await sleep(30); }
+  while (mic && performance.now() < end) { mic.an.getFloatFrequencyData(mic.buf); fn(); await sleep(30); }
 }
 async function calibrate() {
   mic.thr = null;
   showMsg('<h2>Microphone setup 1/2</h2><p>Stay quiet for 2 seconds…</p>');
   let noise = -Infinity;
   await sample(2000, () => { for (let m = 36; m <= 96; m++) noise = Math.max(noise, micLevel(m)); });
+  if (!mic) return; // input was switched away mid-setup
   showMsg('<h2>Microphone setup 2/2</h2><p>Play and hold <b>middle C (C4)</b> at normal loudness…</p>');
   let peak = -Infinity;
   await sample(2500, () => (peak = Math.max(peak, micLevel(60))));
+  if (!mic) return;
   mic.thr = noise + (peak - noise) * 0.4;
   if (peak - noise < 10) {
     showMsg(`<h2>Too quiet</h2><p>I could barely hear the piano. Move the phone closer and try again.</p>
@@ -354,6 +375,7 @@ function micFrame() {
 
 $('input').onchange = () => {
   const v = $('input').value;
+  if (mic) { mic.stream.getTracks().forEach(tr => tr.stop()); mic = null; hideMsg(); } // stop listening (and the mic indicator)
   if (v === 'midi') enableMidi();
   else if (v === 'mic') enableMic();
   else status('Tap the keys on screen.');
