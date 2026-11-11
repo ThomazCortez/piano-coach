@@ -279,7 +279,7 @@ canvas.addEventListener('pointercancel', release);
 let lastTap = -1e9;
 canvas.addEventListener('pointerup', e => {
   if (keyAt(e.offsetX, e.offsetY) != null) return;
-  if (e.timeStamp - lastTap < 350) {
+  if (e.timeStamp - lastTap < 500) {
     lastTap = -1e9;
     (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen())?.catch(() => {});
   } else lastTap = e.timeStamp;
@@ -504,4 +504,8 @@ function frame(now) {
 resize();
 loadLast();
 requestAnimationFrame(frame);
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  const hadWorker = !!navigator.serviceWorker.controller; // first install is not an update: no reload
+  navigator.serviceWorker.addEventListener('controllerchange', () => hadWorker && location.reload());
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
