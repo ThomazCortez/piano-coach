@@ -37,7 +37,12 @@
   <div class="grp">
     <button id="listen">▶ Listen</button>
     <button id="learn">🎹 Learn</button>
-    <button id="stop">■</button>
+    <button id="pause" aria-label="Pause or resume">⏸</button>
+    <button id="stop" aria-label="Stop and go back to the start">■</button>
+  </div>
+  <div class="grp">
+    <label for="volume">Vol</label>
+    <input id="volume" type="range" min="0" max="100" value="80">
   </div>
   <div class="grp">
     <label for="tempo">Tempo</label>

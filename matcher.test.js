@@ -37,4 +37,16 @@ assert.strictEqual(r.i, 1);
 seekStep(r, 99);
 assert.strictEqual(r.i, 2);
 
+// Controller values and sustain pedal.
+const { valueAt, pedalEnd } = require('./matcher.js');
+const vol = [{ time: 0, value: 0.5 }, { time: 2, value: 1 }];
+assert.strictEqual(valueAt([], 5), 1);
+assert.strictEqual(valueAt(vol, 1), 0.5);
+assert.strictEqual(valueAt(vol, 2), 1);
+const ped = [{ time: 1, value: 1 }, { time: 3, value: 0 }];
+assert.strictEqual(pedalEnd(ped, 0.5), 0.5); // released before pedal goes down
+assert.strictEqual(pedalEnd(ped, 2), 3);     // pedal held: rings until pedal up
+assert.strictEqual(pedalEnd([{ time: 0, value: 1 }], 1), 9); // never released: capped
+assert.strictEqual(pedalEnd([], 1), 1);
+
 console.log('matcher: all tests passed');

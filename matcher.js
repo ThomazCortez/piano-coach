@@ -55,4 +55,18 @@ function seekStep(state, t) {
   state.hit = new Set();
 }
 
-if (typeof module !== 'undefined') module.exports = { assignHands, buildSteps, newLearn, press, seekStep, playsHand };
+// MIDI controller value (0..1) in effect at time t; `initial` before the file sets it.
+function valueAt(events, t, initial = 1) {
+  let v = initial;
+  for (const e of events) { if (e.time > t) break; v = e.value; }
+  return v;
+}
+
+// When a note released at `end` actually stops sounding: later if the sustain pedal is held then.
+function pedalEnd(pedal, end) {
+  if (valueAt(pedal, end, 0) < 0.5) return end; // pedal starts up
+  const up = pedal.find(e => e.time > end && e.value < 0.5);
+  return Math.min(up ? up.time : end + 8, end + 8);
+}
+
+if (typeof module !== 'undefined') module.exports = { assignHands, buildSteps, newLearn, press, seekStep, playsHand, valueAt, pedalEnd };

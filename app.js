@@ -19,8 +19,17 @@ const hands = () => $('hands').value;
 const speed = () => $('tempo').value / 100;
 
 // ---------- sound ----------
-let ac = null;
-const audio = () => ac || (ac = new AudioContext(), loadPiano(), ac);
+let ac = null, master = null;
+const audio = () => {
+  if (ac) return ac;
+  ac = new AudioContext();
+  master = ac.createGain();
+  master.gain.value = $('volume').value / 100;
+  master.connect(ac.destination);
+  loadPiano();
+  return ac;
+};
+$('volume').oninput = () => master && (master.gain.value = $('volume').value / 100);
 
 // Salamander Grand Piano samples every 3 semitones (A0..C8); notes in between are pitch-shifted.
 const piano = {};
@@ -42,7 +51,7 @@ function tone(midi, dur, vel = 0.7) {
     src.playbackRate.value = 2 ** ((midi - s) / 12);
     g.gain.value = 0.15 + 0.6 * vel;
     g.gain.setTargetAtTime(0, now + Math.max(dur, 0.1), 0.12); // damper: fade when the key is released
-    src.connect(g).connect(a.destination);
+    src.connect(g).connect(master);
     src.start(now);
     src.stop(now + Math.max(dur, 0.1) + 1);
     return;
@@ -54,7 +63,7 @@ function tone(midi, dur, vel = 0.7) {
   g.gain.setValueAtTime(0, now);
   g.gain.linearRampToValueAtTime(0.25 * vel, now + 0.01);
   g.gain.exponentialRampToValueAtTime(0.001, now + len);
-  o.connect(g).connect(a.destination);
+  o.connect(g).connect(master);
   o.start(now);
   o.stop(now + len + 0.05);
 }
@@ -77,9 +86,20 @@ function setSong(notes, name) {
 function loadMidi(buf, name) {
   const m = new Midi(buf);
   const bar = ticks => (m.header.ticksToMeasures ? Math.floor(m.header.ticksToMeasures(ticks)) + 1 : 0);
-  const tracks = m.tracks.map(tr => tr.notes.map(n => ({
-    midi: n.midi, time: n.time, duration: n.duration, velocity: n.velocity, bar: bar(n.ticks),
-  })));
+  // Controllers act per MIDI channel, not per track (e.g. a pedal written on the left-hand staff holds both hands).
+  const byChannel = {};
+  for (const tr of m.tracks) for (const [num, evs] of Object.entries(tr.controlChanges)) {
+    const key = tr.channel + ':' + num;
+    byChannel[key] = (byChannel[key] || []).concat(evs).sort((a, b) => a.time - b.time);
+  }
+  const tracks = m.tracks.map(tr => {
+    const cc = num => byChannel[tr.channel + ':' + num] || []; // 7 volume, 11 expression, 64 sustain pedal
+    return tr.notes.map(n => ({
+      midi: n.midi, time: n.time, duration: n.duration, bar: bar(n.ticks),
+      velocity: n.velocity * valueAt(cc(7), n.time) * valueAt(cc(11), n.time),
+      sound: pedalEnd(cc(64), n.time + n.duration) - n.time, // how long it rings, pedal included
+    }));
+  });
   setSong(assignHands(tracks), name);
 }
 
@@ -142,13 +162,17 @@ function start(m) {
   }
   autoIdx = song.notes.findIndex(n => n.time >= t);
   if (autoIdx < 0) autoIdx = song.notes.length;
-  playing = true;
+  setPlaying(true);
   $('listen').classList.toggle('on', m === 'listen');
   $('learn').classList.toggle('on', m === 'learn');
 }
+function setPlaying(on) {
+  playing = on;
+  $('pause').textContent = on || mode === 'idle' ? '⏸' : '▶';
+}
 function stop() {
-  playing = false;
   mode = 'idle';
+  setPlaying(false);
   learn = null;
   t = loopA ?? 0;
   $('listen').classList.remove('on');
@@ -160,9 +184,13 @@ function jump(to) {
   if (autoIdx < 0) autoIdx = song.notes.length;
   if (learn) seekStep(learn, t);
 }
-$('listen').onclick = () => (mode === 'listen' ? stop() : start('listen'));
-$('learn').onclick = () => (mode === 'learn' ? stop() : start('learn'));
+// Pressing the active mode again pauses/resumes, like the pause button; ■ goes back to the start.
+const togglePause = () => mode !== 'idle' && setPlaying(!playing);
+$('listen').onclick = () => (mode === 'listen' ? togglePause() : start('listen'));
+$('learn').onclick = () => (mode === 'learn' ? togglePause() : start('learn'));
+$('pause').onclick = togglePause;
 $('stop').onclick = stop;
+addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); togglePause(); } });
 $('tempo').oninput = () => ($('tempoVal').textContent = $('tempo').value + '%');
 $('hands').onchange = () => { if (mode === 'learn') start('learn'); };
 $('setA').onclick = () => { loopA = t; status(`Loop start at ${t.toFixed(1)} s`); };
@@ -185,7 +213,7 @@ function advance(dt) {
   while (autoIdx < song.notes.length && song.notes[autoIdx].time < next) {
     const n = song.notes[autoIdx++];
     if (mode === 'listen' || !playsHand(n, hands())) {
-      tone(n.midi, n.duration / speed(), n.velocity ?? 0.7);
+      tone(n.midi, (n.sound ?? n.duration) / speed(), n.velocity ?? 0.7);
       lightKey(n.midi, COLORS[n.hand], (n.duration / speed()) * 1000);
     }
   }
