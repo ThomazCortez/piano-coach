@@ -372,7 +372,8 @@ function resize() {
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-addEventListener('resize', resize);
+new ResizeObserver(resize).observe(canvas); // also fires when the ⚙ menu opens/closes
+$('menu').onclick = () => $('menu').setAttribute('aria-expanded', $('more').classList.toggle('open'));
 
 function layout() {
   const whites = [];
@@ -406,7 +407,7 @@ function draw() {
     ctx.fillStyle = '#9aa0ad';
     ctx.textAlign = 'center';
     ctx.font = '16px system-ui';
-    ctx.fillText('Open a MIDI file or tap Demo', W / 2, L.top / 2);
+    ctx.fillText('Tap 📂 to open a song (Demo is in ⚙)', W / 2, L.top / 2);
   } else {
     // octave guide lines
     ctx.strokeStyle = '#232733';
