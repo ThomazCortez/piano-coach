@@ -31,7 +31,8 @@
 <body>
 <div id="bar">
   <label class="btn" for="file">Open song</label>
-  <input id="file" type="file" accept=".mid,.midi,audio/midi">
+  <!-- no accept filter: MIDI files often have no .mid ending (Android then hides them); app.js rejects non-MIDI -->
+  <input id="file" type="file">
   <button id="demo">Demo</button>
   <span id="name">No song</span>
   <div class="grp">

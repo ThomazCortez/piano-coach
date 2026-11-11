@@ -111,7 +111,7 @@ $('file').onchange = async e => {
     loadMidi(buf, f.name);
     saveLast(buf, f.name);
   } catch (err) {
-    status('Could not read that file as MIDI: ' + err.message);
+    status(`Could not read "${f.name}" as a MIDI song. Pick a MIDI file.`);
   }
   e.target.value = '';
 };

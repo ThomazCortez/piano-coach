@@ -1,5 +1,5 @@
 // Offline: serve from cache, refresh the cache in the background.
-const CACHE = 'piano-coach-v4';
+const CACHE = 'piano-coach-v5';
 const FILES = ['./', 'index.html', 'app.js', 'matcher.js', 'vendor/Midi.js', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))));
