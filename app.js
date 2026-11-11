@@ -281,9 +281,29 @@ const release = e => { down.delete(pointers.get(e.pointerId)); pointers.delete(e
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
 
+// Dragging sideways above the keys scrubs through the song: right = forward, at the falling notes' speed.
+let scrub = null;
+canvas.addEventListener('pointerdown', e => {
+  if (!song || scrub || keyAt(e.offsetX, e.offsetY) != null) return;
+  canvas.setPointerCapture(e.pointerId);
+  scrub = { id: e.pointerId, x: e.offsetX, t0: t, moved: false };
+});
+canvas.addEventListener('pointermove', e => {
+  if (scrub?.id !== e.pointerId) return;
+  const dx = e.offsetX - scrub.x;
+  if (Math.abs(dx) > 10) scrub.moved = true;
+  if (scrub.moved) jump(Math.min(song.duration, scrub.t0 + dx * (WINDOW / layout().top)));
+});
+
 // Double tap above the keys toggles fullscreen. On pointerup: a touch only counts as a user gesture when it lifts.
 let lastTap = -1e9;
+canvas.addEventListener('pointercancel', e => { if (scrub?.id === e.pointerId) scrub = null; });
 canvas.addEventListener('pointerup', e => {
+  if (scrub?.id === e.pointerId) {
+    const moved = scrub.moved;
+    scrub = null;
+    if (moved) return (lastTap = -1e9);
+  }
   if (keyAt(e.offsetX, e.offsetY) != null) return;
   if (e.timeStamp - lastTap < 500) {
     lastTap = -1e9;
