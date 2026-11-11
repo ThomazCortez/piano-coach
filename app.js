@@ -172,12 +172,18 @@ let wake = null;
 function setPlaying(on) {
   playing = on;
   $('pause').textContent = on || mode === 'idle' ? '⏸' : '▶';
-  // Keep the screen on while playing: the hands are on the piano, not the phone.
-  if (!on) { wake?.release(); wake = null; }
+  updateWake();
+}
+// Keep the screen on while playing or fullscreen: the hands are on the piano, not the phone.
+const wantWake = () => playing || !!document.fullscreenElement;
+function updateWake() {
+  if (!wantWake()) { wake?.release(); wake = null; }
   else if (!wake || wake.released) navigator.wakeLock?.request('screen')
-    .then(w => { if (playing && (!wake || wake.released)) wake = w; else w.release(); })
+    .then(w => { if (wantWake() && (!wake || wake.released)) wake = w; else w.release(); })
     .catch(() => {});
 }
+document.addEventListener('fullscreenchange', updateWake);
+document.addEventListener('visibilitychange', updateWake); // the browser drops the lock when the app is hidden
 function stop() {
   mode = 'idle';
   setPlaying(false);
