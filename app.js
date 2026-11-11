@@ -226,7 +226,9 @@ function advance(dt) {
   if (loopB != null && next >= loopB) return jump(loopA ?? 0);
   while (autoIdx < song.notes.length && song.notes[autoIdx].time < next) {
     const n = song.notes[autoIdx++];
-    if (mode === 'listen' || !playsHand(n, hands())) {
+    // Listen plays the selected hand(s); Learn plays the other hand while the player plays theirs.
+    const mine = playsHand(n, hands());
+    if (mode === 'listen' ? mine : !mine) {
       tone(n.midi, (n.sound ?? n.duration) / speed(), n.velocity ?? 0.7);
       lightKey(n.midi, COLORS[n.hand], (n.duration / speed()) * 1000);
     }
@@ -466,7 +468,7 @@ function draw() {
       ctx.fillStyle = '#ffffff0a';
       ctx.fillRect(0, yB, W, yA - yB);
     }
-    const player = mode === 'learn' ? hands() : 'both';
+    const player = hands();
     for (const n of song.notes) {
       if (n.time > t + WINDOW) break;
       if (n.time + n.duration < t) continue;
