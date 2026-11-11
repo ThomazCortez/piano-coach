@@ -20,8 +20,33 @@ const speed = () => $('tempo').value / 100;
 
 // ---------- sound ----------
 let ac = null;
-const audio = () => (ac ||= new AudioContext());
+const audio = () => ac || (ac = new AudioContext(), loadPiano(), ac);
+
+// Salamander Grand Piano samples every 3 semitones (A0..C8); notes in between are pitch-shifted.
+const piano = {};
+function loadPiano() {
+  for (let m = 21; m <= 108; m += 3) {
+    const name = ['A', 'C', 'Ds', 'Fs'][((m - 21) / 3) % 4] + Math.floor((m - 12) / 12);
+    fetch(`vendor/piano/${name}.mp3`)
+      .then(r => r.arrayBuffer())
+      .then(b => ac.decodeAudioData(b))
+      .then(buf => (piano[m] = buf))
+      .catch(() => {}); // missing sample: that range falls back to the synth
+  }
+}
 function tone(midi, dur, vel = 0.7) {
+  const s = Math.min(108, Math.max(21, 21 + 3 * Math.round((midi - 21) / 3)));
+  if (piano[s]) {
+    const a = audio(), src = a.createBufferSource(), g = a.createGain(), now = a.currentTime;
+    src.buffer = piano[s];
+    src.playbackRate.value = 2 ** ((midi - s) / 12);
+    g.gain.value = 0.15 + 0.6 * vel;
+    g.gain.setTargetAtTime(0, now + Math.max(dur, 0.1), 0.12); // damper: fade when the key is released
+    src.connect(g).connect(a.destination);
+    src.start(now);
+    src.stop(now + Math.max(dur, 0.1) + 1);
+    return;
+  }
   const a = audio(), o = a.createOscillator(), g = a.createGain(), now = a.currentTime;
   const len = Math.min(dur, 3) + 0.3;
   o.type = 'triangle';
@@ -369,7 +394,7 @@ function draw() {
       if (n.time > t + WINDOW) break;
       if (n.time + n.duration < t) continue;
       const r = L.keyRect(n.midi), yb = L.top - (n.time - t) * pps, h = Math.max(4, n.duration * pps);
-      ctx.globalAlpha = playsHand(n, player) ? 1 : 0.3;
+      ctx.globalAlpha = playsHand(n, player) ? 1 : 0.55; // other hand: dimmer but still clearly visible
       ctx.fillStyle = COLORS[n.hand];
       roundRect(r.x + 1, yb - h, r.w - 2, h, 4);
       if (r.w > 16 && h > 14) {

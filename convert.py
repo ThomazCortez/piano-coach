@@ -38,7 +38,7 @@ def pdf_to_musicxml(pdf, workdir):
 
 
 def musicxml_to_midi(files, out):
-    from music21 import converter, stream
+    from music21 import bar, converter, repeat, spanner, stream
 
     score = converter.parse(files[0])
     for extra in files[1:]:  # append later movements after the first one
@@ -46,7 +46,18 @@ def musicxml_to_midi(files, out):
         for mine, theirs in zip(score.parts, more.parts):
             for m in theirs.getElementsByClass(stream.Measure):
                 mine.append(m)
-    score.write("midi", fp=out)
+    try:
+        score.write("midi", fp=out)
+    except repeat.ExpanderException:
+        # Misread repeat signs can't be unfolded: drop them and play the score straight through.
+        print("Warning: the repeat signs were misread, so repeats are ignored (each section plays once).")
+        for m in score.recurse().getElementsByClass(stream.Measure):
+            for side in ("leftBarline", "rightBarline"):
+                if isinstance(getattr(m, side), bar.Repeat):
+                    setattr(m, side, bar.Barline("regular"))
+        for el in list(score.recurse().getElementsByClass([repeat.RepeatExpression, spanner.RepeatBracket])):
+            el.activeSite.remove(el)
+        score.write("midi", fp=out)
     return len(score.parts)
 
 
