@@ -1,6 +1,6 @@
 // Offline: serve from cache, refresh the cache in the background.
-const CACHE = 'piano-coach-v12';
-const FILES = ['./', 'index.html', 'app.js', 'matcher.js', 'vendor/Midi.js', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'piano-coach-v14';
+const FILES = ['./', 'index.html', 'app.js', 'matcher.js', 'coach.js', 'library.js', 'roll.js', 'vendor/Midi.js', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 // A new version takes over at once (skipWaiting + claim); app.js then reloads the page to show it.
 // Without this an installed app keeps the old code until every window of it has been closed.
